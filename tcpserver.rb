@@ -1,5 +1,5 @@
 require "socket"
-# require "pry"
+require "pry"
 
 server = TCPServer.open(8001)
 
@@ -33,10 +33,16 @@ while true
   socket = server.accept
   puts "accepted..."
   pid = fork do
-    puts socket
+    # TODO: 別クラスにしたい
+    Thread.start(socket) do | socket |
+      socket.each_line do | line |
+        puts line
+      end
+    end
     begin
-      while buffer = socket.gets
+      while buffer = gets
         puts buffer
+        socket.sendmsg(buffer)
         if buffer.chomp == "exit"
           break
         end
