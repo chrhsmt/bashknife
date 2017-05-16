@@ -32,51 +32,62 @@ end
 
 while true
   log.info("waiting...")
-  socket = server.accept
+  bash_socket = server.accept
   log.info("accepted...")
   pid = fork do
     log.info("pid is : #{Process.pid}")
-    log.info("addr is : #{socket.addr}")
-    # TODO: 別クラスにしたい
-    thread = Thread.start(socket) do | socket |
-      begin
-        socket.each_line do | line |
-          # this is received line buffer
-          log.info(line.strip)
-        end
-      ensure
-        log.info("thread will be destroyed")
-      end
-    end
-    log.info("thread is: #{thread.inspect}")
+    log.info("addr is : #{bash_socket.addr}")
+    sock_name = "server_#{Process.pid}.sock"
+    log.info("sock_name is: #{sock_name}")
+
     begin
-      while buffer = gets
-        # this is input line buffer
-        log.info(buffer)
-        socket.sendmsg(buffer)
-        if buffer.chomp == "exit"
-          break
+      sock_thread = Thread.new do
+        UNIXServer.open(sock_name) do | userver |
+          log.info(userver)
+          log.info("unix domain socket server waiting...")
+          usock = userver.accept
+          log.info(usock)
+
+          # connect unix socket to remote
+          usock.send_io bash_socket
+          rio = usock.recv_io
+          begin
+            while buffer = rio.gets
+              # this is input line buffer
+              log.info(buffer.strip)
+              bash_socket.sendmsg(buffer)
+              if buffer.chomp == "exit"
+                usock.write(buffer)
+                break
+              end
+            end
+          rescue Errno::EPIPE => e
+            log.error(e)
+            break
+          end
         end
+        File.unlink(sock_name)
       end
+      sock_thread.join
     ensure
-      socket.close
-      thread.kill
+      bash_socket.close
       log.info("close")
     end
+
   end
   # 親では必ず直ぐに切断する
-  socket.close
+  bash_socket.close
 
 
-  # Thread.start(server.accept) do | socket |
+  # Thread.start(server.accept) do | bash_socket |
   #   log.info("accepted...")
-  #   while buffer = socket.gets
+  #   while buffer = bash_socket.gets
   #     log.info(buffer)
   #     if buffer.chomp == "exit"
   #       break
   #     end
   #   end
-  #   socket.close
+  #   bash_socket.close
   # end
 
 end
