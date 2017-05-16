@@ -33,14 +33,22 @@ while true
   socket = server.accept
   puts "accepted..."
   pid = fork do
+    puts "pid is : #{Process.pid}"
     # TODO: 別クラスにしたい
-    Thread.start(socket) do | socket |
-      socket.each_line do | line |
-        puts line
+    thread = Thread.start(socket) do | socket |
+      begin
+        socket.each_line do | line |
+          # this is received line buffer
+          puts line
+        end
+      ensure
+        puts "thread will be destroyed"
       end
     end
+    puts "thread is: #{thread.inspect}"
     begin
       while buffer = gets
+        # this is input line buffer
         puts buffer
         socket.sendmsg(buffer)
         if buffer.chomp == "exit"
@@ -49,6 +57,7 @@ while true
       end
     ensure
       socket.close
+      thread.kill
       puts "close"
     end
   end
