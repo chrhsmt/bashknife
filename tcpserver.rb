@@ -1,7 +1,9 @@
+require "logger"
 require "socket"
 require "pry"
 
 server = TCPServer.open(8001)
+log = Logger.new(STDOUT)
 
 Signal.trap(:SIGCHLD) do |sig|
   puts "interrupted by signal #{sig} at #{caller[1]}"
@@ -29,27 +31,28 @@ Signal.trap(:SIGCHLD) do |sig|
 end
 
 while true
-  puts "waiting..."
+  log.info("waiting...")
   socket = server.accept
-  puts "accepted..."
+  log.info("accepted...")
   pid = fork do
-    puts "pid is : #{Process.pid}"
+    log.info("pid is : #{Process.pid}")
+    log.info("addr is : #{socket.addr}")
     # TODO: 別クラスにしたい
     thread = Thread.start(socket) do | socket |
       begin
         socket.each_line do | line |
           # this is received line buffer
-          puts line
+          log.info(line.strip)
         end
       ensure
-        puts "thread will be destroyed"
+        log.info("thread will be destroyed")
       end
     end
-    puts "thread is: #{thread.inspect}"
+    log.info("thread is: #{thread.inspect}")
     begin
       while buffer = gets
         # this is input line buffer
-        puts buffer
+        log.info(buffer)
         socket.sendmsg(buffer)
         if buffer.chomp == "exit"
           break
@@ -58,7 +61,7 @@ while true
     ensure
       socket.close
       thread.kill
-      puts "close"
+      log.info("close")
     end
   end
   # 親では必ず直ぐに切断する
@@ -66,9 +69,9 @@ while true
 
 
   # Thread.start(server.accept) do | socket |
-  #   puts "accepted..."
+  #   log.info("accepted...")
   #   while buffer = socket.gets
-  #     puts buffer
+  #     log.info(buffer)
   #     if buffer.chomp == "exit"
   #       break
   #     end
